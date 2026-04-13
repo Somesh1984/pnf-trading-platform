@@ -11,19 +11,102 @@ from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Circle
 
+from pnf.core import PnFConfig, build_columns
+
 from .chart_shared import BEARISH, BULLISH, BoxSize, DateTimeUnit, SIGNAL_TYPES, tabulate
 
 
 class ChartEngineMixin:
     action_index_matrix: Any
     boxscale: np.ndarray
+    boxsize: BoxSize
     method: str
     pnf_timeseries: dict[str, Any]
     reversal: int
+    scaling: str
     ts: dict[str, np.ndarray]
 
     if TYPE_CHECKING:
         def _datetime_unit(self) -> DateTimeUnit | None: ...
+
+    def _uses_step_frozen_log_scaling(self) -> bool:
+        return self.scaling == 'log'
+
+    def _get_step_frozen_log_chart(self):
+        method_map = {
+            'cl': 'close',
+            'h/l': 'high_low',
+            'l/h': 'high_low',
+            'hlc': 'high_low_close',
+        }
+        if self.method not in method_map:
+            raise ValueError('Step-frozen log scaling is not implemented for ohlc method')
+
+        data = self._iter_step_frozen_log_input()
+        config = PnFConfig(
+            box_pct=float(self.boxsize) / 100.0,
+            reversal=self.reversal,
+            method=method_map[self.method],
+            scaling='step_box',
+        )
+        columns = build_columns(data, config)
+        if not columns:
+            raise ValueError('Choose a smaller box size. There is no trend using the current parameter.')
+
+        box_values = sorted({float(box) for column in columns for box in column.boxes})
+        boxscale = np.asarray(box_values, dtype=np.float64)
+        box_index = {value: index for index, value in enumerate(box_values)}
+
+        matrix = np.zeros([np.size(boxscale), len(columns)], dtype=int)
+        action_index_matrix = np.zeros([np.size(boxscale), len(columns)], dtype=int)
+
+        pnf_steps = np.full([len(self.ts['date']), 5], np.nan)
+
+        for column_index, column in enumerate(columns):
+            trend = BULLISH if column.type == 'X' else BEARISH
+            for box in column.boxes:
+                row = box_index[float(box)]
+                matrix[row, column_index] = trend
+                action_index_matrix[row, column_index] = column.end_index
+
+            last_box = column.last_box
+            row = box_index[float(last_box)]
+            pnf_steps[column.end_index, :] = [
+                float(last_box),
+                row,
+                column_index,
+                trend,
+                column.box_count,
+            ]
+
+        pftseries = {
+            'date': self.ts['date'],
+            'box value': pnf_steps[:, 0],
+            'box index': pnf_steps[:, 1],
+            'column index': pnf_steps[:, 2],
+            'trend': pnf_steps[:, 3],
+            'filled boxes': pnf_steps[:, 4],
+        }
+
+        return boxscale, pftseries, matrix, action_index_matrix
+
+    def _iter_step_frozen_log_input(self):
+        if self.method == 'cl':
+            for close in self.ts['close']:
+                yield {'close': close}
+            return
+
+        if self.method in {'h/l', 'l/h'}:
+            for high, low in zip(self.ts['high'], self.ts['low']):
+                yield {'high': high, 'low': low}
+            return
+
+        if self.method == 'hlc':
+            for high, low, close in zip(self.ts['high'], self.ts['low'], self.ts['close']):
+                yield {'high': high, 'low': low, 'close': close}
+            return
+
+        raise ValueError('Unsupported step-frozen log method')
 
     def _get_first_trend(self):
         """

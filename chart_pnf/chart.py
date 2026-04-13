@@ -66,13 +66,15 @@ class PointFigureChart(
         methods implemented: 'cl', 'h/l', 'l/h', 'hlc', 'ohlc' default('cl')
     boxscaling: str
         scales implemented:
-            'abs', 'atr', 'cla', 'log' default('log')
+            'abs', 'atr', 'cla', 'log', 'log_compounding' default('log')
         abs:
             absolute scaling with fixed box sizes.
         atr:
             absolute scaling with atr of last n periods
         log:
-            logarithmic scaling with variable box sizes.
+            step-frozen percentage box sizing.
+        log_compounding:
+            legacy logarithmic scaling with a global compounding box grid.
         cla:
             classic scaling with semi-variable box sizes.
     boxsize: int/float/string
@@ -150,10 +152,18 @@ class PointFigureChart(
 
         # chart
         self.title = self._make_title(title)
-        self.boxscale = self._get_boxscale()
-        self.pnf_timeseries = self._get_pnf_timeseries()
-        self.action_index_matrix: Any = None  # assigned in _pnf_timeseries2matrix()
-        self.matrix = self._pnf_timeseries2matrix()
+        if self._uses_step_frozen_log_scaling():
+            (
+                self.boxscale,
+                self.pnf_timeseries,
+                self.matrix,
+                self.action_index_matrix,
+            ) = self._get_step_frozen_log_chart()
+        else:
+            self.boxscale = self._get_boxscale()
+            self.pnf_timeseries = self._get_pnf_timeseries()
+            self.action_index_matrix: Any = None  # assigned in _pnf_timeseries2matrix()
+            self.matrix = self._pnf_timeseries2matrix()
         self.column_labels = self._get_column_entry_dates()
 
         # trendlines

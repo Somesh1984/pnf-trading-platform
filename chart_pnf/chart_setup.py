@@ -41,8 +41,8 @@ class ChartSetupMixin:
     @staticmethod
     def _is_valid_scaling(scaling):
 
-        if scaling not in ['abs', 'log', 'cla', 'atr']:
-            raise ValueError("Not a valid scaling. Valid scales are: abs, log, cla and atr")
+        if scaling not in ['abs', 'log', 'log_compounding', 'cla', 'atr']:
+            raise ValueError("Not a valid scaling. Valid scales are: abs, log, log_compounding, cla and atr")
 
         return scaling
 
@@ -63,7 +63,7 @@ class ChartSetupMixin:
                 msg = 'ValueError: For cla scaling valid values for boxsize are 0.02, 0.05, 0.1, 0.25, 1/3, 0.5, 1, 2'
                 raise ValueError(msg)
 
-        elif self.scaling == 'log':
+        elif self.scaling in {'log', 'log_compounding'}:
             if isinstance(boxsize, str):
                 raise ValueError('ValueError: The boxsize must be numeric for log scaling.')
             if boxsize < 0.01:
@@ -90,7 +90,7 @@ class ChartSetupMixin:
 
         if title is None:
 
-            if self.scaling == 'log':
+            if self.scaling in {'log', 'log_compounding'}:
                 title = f'Point & Figure ({self.scaling}|{self.method}) {self.boxsize}% x {self.reversal}'
 
             elif self.scaling == 'cla':
@@ -101,7 +101,7 @@ class ChartSetupMixin:
 
         else:
 
-            if self.scaling == 'log':
+            if self.scaling in {'log', 'log_compounding'}:
                 title = f'Point & Figure ({self.scaling}|{self.method}) {self.boxsize}% x {self.reversal} | {title}'
 
             elif self.scaling == 'cla':
@@ -187,7 +187,8 @@ class ChartSetupMixin:
         # to datetime64 else create index of integers.
         # If the string can't converted to datetime64 create index of integers.
         if 'date' not in ts:
-            ts['date'] = np.arange(0, ts['close'].shape[0])
+            first_key = next(iter(ts))
+            ts['date'] = np.arange(0, ts[first_key].shape[0])
 
         if isinstance(ts['date'][0], str):
 
@@ -224,7 +225,7 @@ class ChartSetupMixin:
                 self.time_step = None
 
         if not isinstance(ts['date'][0], np.datetime64):
-            ts['date'] = np.arange(0, ts['close'].shape[0])
+            ts['date'] = np.arange(0, ts['date'].shape[0])
 
         # check if all arrays have the same length
         length = [x.shape[0] for x in ts.values()]
@@ -298,7 +299,7 @@ class ChartSetupMixin:
                 n += 1
 
         # make scale for logarithmic scaling
-        elif self.scaling == 'log':
+        elif self.scaling in {'log', 'log_compounding'}:
 
             boxsize = np.float64(self.boxsize)
             minval = 0.0001  # minimum value for log-scaled axis

@@ -1,5 +1,7 @@
 import unittest
 
+import numpy as np
+
 from chart_pnf import (
     ChartCountMixin,
     ChartEngineMixin,
@@ -46,6 +48,68 @@ class ChartModularTests(unittest.TestCase):
 
         for mixin in expected_mixins:
             self.assertTrue(issubclass(PointFigureChart, mixin))
+
+    def test_log_scaling_uses_step_frozen_percentage_boxes_for_close_method(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 103, 107.12]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        filled_boxes = chart.boxscale[np.where(chart.matrix[:, 0] == 1)]
+
+        np.testing.assert_allclose(
+            filled_boxes,
+            np.array([101.0, 102.0, 103.0, 104.03, 105.06, 106.09, 107.12]),
+        )
+
+    def test_log_compounding_scaling_keeps_legacy_global_log_grid(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 103, 107.12]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log_compounding",
+        )
+
+        filled_boxes = chart.boxscale[np.where(chart.matrix[:, 0] == 1)]
+
+        self.assertIn("Point & Figure (log_compounding|cl) 1% x 3", chart.title)
+        self.assertGreater(len(filled_boxes), 0)
+        self.assertFalse(
+            np.allclose(
+                filled_boxes[: min(len(filled_boxes), 7)],
+                np.array([101.0, 102.0, 103.0, 104.03, 105.06, 106.09, 107.12])[: min(len(filled_boxes), 7)],
+            )
+        )
+
+    def test_log_scaling_initial_column_requires_reversal_move(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(
+                ts={"close": [100, 101]},
+                method="cl",
+                reversal=3,
+                boxsize=1,
+                scaling="log",
+            )
+
+    def test_log_scaling_supports_high_low_reversal(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "high": [100, 103, 102],
+                "low": [100, 103, 99.91],
+            },
+            method="h/l",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 2)
+        self.assertEqual(chart.pnf_timeseries["trend"][1], 1)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
 
 
 if __name__ == "__main__":
