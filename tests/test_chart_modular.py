@@ -262,6 +262,92 @@ class ChartModularTests(unittest.TestCase):
         np.testing.assert_array_equal(first.matrix, second.matrix)
         np.testing.assert_array_equal(first.pnf_timeseries["trend"], second.pnf_timeseries["trend"])
 
+    def test_log_scaling_large_gap_up_creates_multiple_x_boxes(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 107]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 0]), 7)
+        self.assertEqual(chart.pnf_timeseries["trend"][1], 1)
+        self.assertEqual(chart.pnf_timeseries["filled boxes"][1], 7)
+
+    def test_log_scaling_large_gap_down_creates_multiple_o_boxes(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 92]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 0]), 8)
+        self.assertEqual(chart.pnf_timeseries["trend"][1], -1)
+        self.assertEqual(chart.pnf_timeseries["filled boxes"][1], 8)
+
+    def test_log_scaling_exact_reversal_threshold_creates_reversal(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 103, 99.91]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 2)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 1]), 3)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
+
+    def test_log_scaling_move_below_reversal_threshold_does_not_reverse(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 103, 99.92]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 0]), 3)
+
+    def test_log_scaling_x_to_o_reversal_works(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 103, 99.91]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.pnf_timeseries["trend"][1], 1)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
+
+    def test_log_scaling_o_to_x_reversal_works(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 97, 99.91]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 2)
+        self.assertEqual(chart.pnf_timeseries["trend"][1], -1)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], 1)
+
+    def test_log_scaling_gap_and_reversal_cases_are_deterministic(self) -> None:
+        ts = {"close": [100, 107, 99.51, 105.48, 98.15]}
+        first = PointFigureChart(ts=ts, method="cl", reversal=3, boxsize=1, scaling="log")
+        second = PointFigureChart(ts=ts, method="cl", reversal=3, boxsize=1, scaling="log")
+
+        np.testing.assert_array_equal(first.matrix, second.matrix)
+        np.testing.assert_array_equal(first.pnf_timeseries["trend"], second.pnf_timeseries["trend"])
+
 
 if __name__ == "__main__":
     unittest.main()
