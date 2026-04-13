@@ -56,6 +56,7 @@ class _StepFrozenColumn:
 @dataclass(frozen=True)
 class _StepFrozenUpdate:
     index: int
+    open: Decimal | None = None
     close: Decimal | None = None
     high: Decimal | None = None
     low: Decimal | None = None
@@ -184,29 +185,37 @@ def _iter_step_frozen_updates(
     config: _StepFrozenConfig,
 ) -> Iterator[_StepFrozenUpdate]:
     for index, item in enumerate(data):
+        open_ = _require_step_price(item.get('open'))
         close = _require_step_price(item.get('close'))
         high = _require_step_price(item.get('high'))
         low = _require_step_price(item.get('low'))
 
+        open_ = _round_step_price(open_, config) if open_ is not None else None
         close = _round_step_price(close, config) if close is not None else None
         high = _round_step_price(high, config) if high is not None else None
         low = _round_step_price(low, config) if low is not None else None
 
         if high is not None and low is not None and high < low:
             raise ValueError("high must be greater than or equal to low")
-        if config.method == 'hlc' and close is not None and high is not None and close > high:
+        if config.method in {'hlc', 'ohlc'} and close is not None and high is not None and close > high:
             raise ValueError("close must be less than or equal to high")
-        if config.method == 'hlc' and close is not None and low is not None and close < low:
+        if config.method in {'hlc', 'ohlc'} and close is not None and low is not None and close < low:
             raise ValueError("close must be greater than or equal to low")
+        if config.method == 'ohlc' and open_ is not None and high is not None and open_ > high:
+            raise ValueError("open must be less than or equal to high")
+        if config.method == 'ohlc' and open_ is not None and low is not None and open_ < low:
+            raise ValueError("open must be greater than or equal to low")
 
-        if close is None and high is None and low is None:
+        if open_ is None and close is None and high is None and low is None:
             continue
-        yield _StepFrozenUpdate(index=index, close=close, high=high, low=low)
+        yield _StepFrozenUpdate(index=index, open=open_, close=close, high=high, low=low)
 
 
 def _initial_step_prices(update: _StepFrozenUpdate, config: _StepFrozenConfig) -> tuple[Decimal, ...]:
     if config.method == 'cl':
         return () if update.close is None else (update.close,)
+    if config.method == 'ohlc':
+        return _step_ohlc_prices(update)
     if config.method == 'l/h':
         return tuple(price for price in (update.low, update.high) if price is not None)
     values = [update.high, update.low]
@@ -247,10 +256,7 @@ def _process_step_update(
     if config.method == 'hlc':
         return _process_step_hlc_update(active, update, reference, box_size, config)
 
-    for price_name in _step_update_order(active, config):
-        price = getattr(update, price_name)
-        if price is None:
-            continue
+    for price in _step_update_prices(active, update, config):
         updated = _process_step_price(active, price, update.index, reference, box_size, config)
         if updated is not active:
             return updated
@@ -288,6 +294,20 @@ def _process_step_hlc_update(
     return active
 
 
+def _step_update_prices(
+    active: _StepFrozenColumn,
+    update: _StepFrozenUpdate,
+    config: _StepFrozenConfig,
+) -> tuple[Decimal, ...]:
+    if config.method == 'ohlc':
+        return _step_ohlc_prices(update)
+    return tuple(
+        price
+        for price in (getattr(update, price_name) for price_name in _step_update_order(active, config))
+        if price is not None
+    )
+
+
 def _step_update_order(active: _StepFrozenColumn, config: _StepFrozenConfig) -> tuple[str, ...]:
     if config.method == 'cl':
         return ('close',)
@@ -296,6 +316,14 @@ def _step_update_order(active: _StepFrozenColumn, config: _StepFrozenConfig) -> 
     if config.method == 'l/h':
         return ('low', 'high')
     raise ValueError(f"Unsupported step-frozen method: {config.method}")
+
+
+def _step_ohlc_prices(update: _StepFrozenUpdate) -> tuple[Decimal, ...]:
+    if update.open is None or update.high is None or update.low is None or update.close is None:
+        return tuple(price for price in (update.open, update.high, update.low, update.close) if price is not None)
+    if update.open <= update.close:
+        return (update.open, update.low, update.high, update.close)
+    return (update.open, update.high, update.low, update.close)
 
 
 def _process_step_price(
@@ -366,9 +394,6 @@ class ChartEngineMixin:
         return self.scaling == 'log'
 
     def _get_step_frozen_log_chart(self):
-        if self.method == 'ohlc':
-            raise ValueError('Step-frozen log scaling is not implemented for ohlc method')
-
         data = self._iter_step_frozen_log_input()
         config = _StepFrozenConfig(
             box_pct=Decimal(str(float(self.boxsize) / 100.0)),
@@ -430,6 +455,11 @@ class ChartEngineMixin:
         if self.method == 'hlc':
             for high, low, close in zip(self.ts['high'], self.ts['low'], self.ts['close']):
                 yield {'high': high, 'low': low, 'close': close}
+            return
+
+        if self.method == 'ohlc':
+            for open_, high, low, close in zip(self.ts['open'], self.ts['high'], self.ts['low'], self.ts['close']):
+                yield {'open': open_, 'high': high, 'low': low, 'close': close}
             return
 
         raise ValueError('Unsupported step-frozen log method')

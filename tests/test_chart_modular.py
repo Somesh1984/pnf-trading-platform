@@ -213,6 +213,55 @@ class ChartModularTests(unittest.TestCase):
         self.assertEqual(np.count_nonzero(chart.matrix[:, 1]), 4)
         self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
 
+    def test_log_scaling_ohlc_supports_existing_bullish_candle_order(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "open": [100, 100, 103],
+                "high": [100, 103, 104.03],
+                "low": [100, 100, 99.91],
+                "close": [100, 103, 104],
+            },
+            method="ohlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 2)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
+        self.assertEqual(chart.pnf_timeseries["filled boxes"][2], 3)
+
+    def test_log_scaling_ohlc_supports_existing_bearish_candle_order(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "open": [100, 100, 104],
+                "high": [100, 103, 104.03],
+                "low": [100, 100, 99.91],
+                "close": [100, 103, 100],
+            },
+            method="ohlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], 1)
+        self.assertEqual(chart.pnf_timeseries["filled boxes"][2], 4)
+
+    def test_log_scaling_ohlc_is_deterministic(self) -> None:
+        ts = {
+            "open": [100, 100, 103],
+            "high": [100, 103, 104.03],
+            "low": [100, 100, 99.91],
+            "close": [100, 103, 104],
+        }
+        first = PointFigureChart(ts=ts, method="ohlc", reversal=3, boxsize=1, scaling="log")
+        second = PointFigureChart(ts=ts, method="ohlc", reversal=3, boxsize=1, scaling="log")
+
+        np.testing.assert_array_equal(first.matrix, second.matrix)
+        np.testing.assert_array_equal(first.pnf_timeseries["trend"], second.pnf_timeseries["trend"])
+
 
 if __name__ == "__main__":
     unittest.main()
