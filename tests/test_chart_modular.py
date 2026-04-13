@@ -17,6 +17,10 @@ from chart_pnf import (
 )
 
 
+def _column_price_boxes(chart: PointFigureChart, column_index: int) -> np.ndarray:
+    return chart.boxscale[np.where(chart.matrix[:, column_index] != 0)]
+
+
 class ChartModularTests(unittest.TestCase):
     def test_public_chart_entrypoint_keeps_legacy_api(self) -> None:
         chart = PointFigureChart(
@@ -480,6 +484,101 @@ class ChartModularTests(unittest.TestCase):
         np.testing.assert_array_equal(first.matrix, second.matrix)
         np.testing.assert_array_equal(first.boxscale, second.boxscale)
         np.testing.assert_array_equal(first.pnf_timeseries["trend"], second.pnf_timeseries["trend"])
+
+    def test_log_scaling_completed_close_column_is_stable_after_future_data(self) -> None:
+        partial = PointFigureChart(
+            ts={"close": [100, 103, 99.91]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+        full = PointFigureChart(
+            ts={"close": [100, 103, 99.91, 105.90, 98.48]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertGreaterEqual(partial.matrix.shape[1], 2)
+        self.assertGreaterEqual(full.matrix.shape[1], 2)
+        np.testing.assert_allclose(_column_price_boxes(full, 0), _column_price_boxes(partial, 0))
+        np.testing.assert_allclose(_column_price_boxes(full, 1), _column_price_boxes(partial, 1))
+
+    def test_log_scaling_reversal_does_not_repaint_previous_close_column(self) -> None:
+        before_reversal = PointFigureChart(
+            ts={"close": [100, 103]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+        after_reversal = PointFigureChart(
+            ts={"close": [100, 103, 99.91]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        np.testing.assert_allclose(_column_price_boxes(after_reversal, 0), _column_price_boxes(before_reversal, 0))
+
+    def test_log_scaling_completed_high_low_columns_are_stable_after_future_data(self) -> None:
+        partial = PointFigureChart(
+            ts={
+                "high": [100, 103, 102],
+                "low": [100, 103, 99.91],
+            },
+            method="h/l",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+        full = PointFigureChart(
+            ts={
+                "high": [100, 103, 102, 105.90, 104],
+                "low": [100, 103, 99.91, 100, 98.48],
+            },
+            method="h/l",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertGreaterEqual(partial.matrix.shape[1], 2)
+        self.assertGreaterEqual(full.matrix.shape[1], 2)
+        np.testing.assert_allclose(_column_price_boxes(full, 0), _column_price_boxes(partial, 0))
+        np.testing.assert_allclose(_column_price_boxes(full, 1), _column_price_boxes(partial, 1))
+
+    def test_log_scaling_completed_hlc_columns_are_stable_after_future_data(self) -> None:
+        partial = PointFigureChart(
+            ts={
+                "high": [100, 103, 103],
+                "low": [100, 103, 98.88],
+                "close": [100, 103, 99.91],
+            },
+            method="hlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+        full = PointFigureChart(
+            ts={
+                "high": [100, 103, 103, 105.90, 104],
+                "low": [100, 103, 98.88, 100, 98.48],
+                "close": [100, 103, 99.91, 105.90, 98.48],
+            },
+            method="hlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertGreaterEqual(partial.matrix.shape[1], 2)
+        self.assertGreaterEqual(full.matrix.shape[1], 2)
+        np.testing.assert_allclose(_column_price_boxes(full, 0), _column_price_boxes(partial, 0))
+        np.testing.assert_allclose(_column_price_boxes(full, 1), _column_price_boxes(partial, 1))
 
 
 if __name__ == "__main__":
