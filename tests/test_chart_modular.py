@@ -54,6 +54,78 @@ class ChartModularTests(unittest.TestCase):
     def test_chart_engine_does_not_depend_on_pnf_core(self) -> None:
         self.assertNotIn("pnf.core", inspect.getsource(chart_engine_module))
 
+    def test_chart_rejects_invalid_method(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="open", reversal=3, boxsize=1, scaling="log")
+
+    def test_chart_rejects_invalid_scaling(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3, boxsize=1, scaling="linear")
+
+    def test_chart_rejects_invalid_reversal_type(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3.0, boxsize=1, scaling="log")
+
+    def test_chart_rejects_reversal_less_than_one(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=0, boxsize=1, scaling="log")
+
+    def test_chart_rejects_string_log_boxsize(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3, boxsize="1", scaling="log")
+
+    def test_chart_rejects_too_small_log_boxsize(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3, boxsize=0.001, scaling="log")
+
+    def test_chart_rejects_invalid_classic_boxsize(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3, boxsize=0.03, scaling="cla")
+
+    def test_chart_rejects_string_absolute_boxsize(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3, boxsize="1", scaling="abs")
+
+    def test_chart_rejects_invalid_atr_boxsize(self) -> None:
+        with self.assertRaises(ValueError):
+            PointFigureChart(
+                ts={"close": [100, 103, 107], "high": [101, 104, 108], "low": [99, 102, 106]},
+                method="cl",
+                reversal=3,
+                boxsize=1.5,
+                scaling="atr",
+            )
+
+    def test_chart_rejects_missing_close_for_close_method(self) -> None:
+        with self.assertRaises(KeyError):
+            PointFigureChart(ts={"high": [100, 103]}, method="cl", reversal=3, boxsize=1, scaling="log")
+
+    def test_chart_rejects_missing_high_or_low_for_high_low_methods(self) -> None:
+        with self.assertRaises(KeyError):
+            PointFigureChart(ts={"low": [100, 99]}, method="h/l", reversal=3, boxsize=1, scaling="log")
+        with self.assertRaises(KeyError):
+            PointFigureChart(ts={"high": [100, 103]}, method="l/h", reversal=3, boxsize=1, scaling="log")
+
+    def test_chart_rejects_missing_close_for_hlc_method(self) -> None:
+        with self.assertRaises(KeyError):
+            PointFigureChart(
+                ts={"high": [100, 103], "low": [100, 99]},
+                method="hlc",
+                reversal=3,
+                boxsize=1,
+                scaling="log",
+            )
+
+    def test_chart_rejects_missing_open_for_ohlc_method(self) -> None:
+        with self.assertRaises(KeyError):
+            PointFigureChart(
+                ts={"high": [100, 103], "low": [100, 99], "close": [100, 101]},
+                method="ohlc",
+                reversal=3,
+                boxsize=1,
+                scaling="log",
+            )
+
     def test_log_scaling_uses_step_frozen_percentage_boxes_for_close_method(self) -> None:
         chart = PointFigureChart(
             ts={"close": [100, 103, 107.12]},

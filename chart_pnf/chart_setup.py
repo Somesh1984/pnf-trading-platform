@@ -34,7 +34,9 @@ class ChartSetupMixin:
     def _is_valid_reversal(reversal):
 
         if not isinstance(reversal, int):
-            ValueError('Value for reversal must be an integer. Reversal is usually between 1 and 5.')
+            raise ValueError('Value for reversal must be an integer. Reversal is usually between 1 and 5.')
+        if reversal < 1:
+            raise ValueError('Value for reversal must be greater than or equal to 1.')
 
         return reversal
 
