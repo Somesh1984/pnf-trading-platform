@@ -1,4 +1,5 @@
 import unittest
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -6,7 +7,7 @@ from chart_pnf import PointFigureChart
 from chart_pnf.chart_shared import SIGNAL_TYPES
 
 
-def _close_chart(close: list[float], scaling: str = "abs") -> PointFigureChart:
+def _close_chart(close: Sequence[float], scaling: str = "abs") -> PointFigureChart:
     return PointFigureChart(
         ts={"close": close},
         method="cl",
@@ -120,6 +121,7 @@ class ChartPatternSignalLogicTests(unittest.TestCase):
                     chart = _close_chart(close)
                     signals = getattr(chart, method)()
                     _assert_signal_schema(self, signals, chart.matrix.shape[1])
+                    self.assertEqual(len(chart.ts_signals_map), len(chart.pnf_timeseries["box index"]))
 
                     used_types = signals["type"][signals["width"] != 0]
                     self.assertTrue(np.all(used_types >= 0))
