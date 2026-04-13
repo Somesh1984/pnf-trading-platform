@@ -589,6 +589,36 @@ class ChartModularTests(unittest.TestCase):
         np.testing.assert_allclose(_column_price_boxes(full, 0), _column_price_boxes(partial, 0))
         np.testing.assert_allclose(_column_price_boxes(full, 1), _column_price_boxes(partial, 1))
 
+    def test_log_scaling_large_close_dataset_is_deterministic(self) -> None:
+        pattern = np.array([100.0, 103.0, 99.91, 105.90, 98.48, 104.39, 97.13, 103.0])
+        close = np.tile(pattern, 12500)
+        ts = {"close": close}
+
+        first = PointFigureChart(ts=ts, method="cl", reversal=3, boxsize=1, scaling="log")
+        second = PointFigureChart(ts=ts, method="cl", reversal=3, boxsize=1, scaling="log")
+
+        self.assertEqual(len(close), 100000)
+        self.assertGreater(first.matrix.size, 0)
+        self.assertEqual(len(first.pnf_timeseries["trend"]), len(close))
+        self.assertTrue(np.all(np.isfinite(first.boxscale)))
+        np.testing.assert_array_equal(first.matrix, second.matrix)
+        np.testing.assert_array_equal(first.boxscale, second.boxscale)
+        np.testing.assert_array_equal(first.pnf_timeseries["trend"], second.pnf_timeseries["trend"])
+
+    def test_log_scaling_large_hlc_dataset_builds_candle_path(self) -> None:
+        close_pattern = np.array([100.0, 103.0, 99.91, 105.90, 98.48])
+        close = np.tile(close_pattern, 5000)
+        high = close + 0.25
+        low = close - 0.25
+        ts = {"high": high, "low": low, "close": close}
+
+        chart = PointFigureChart(ts=ts, method="hlc", reversal=3, boxsize=1, scaling="log")
+
+        self.assertEqual(len(close), 25000)
+        self.assertGreater(chart.matrix.size, 0)
+        self.assertEqual(len(chart.pnf_timeseries["trend"]), len(close))
+        self.assertTrue(np.all(np.isfinite(chart.boxscale)))
+
 
 if __name__ == "__main__":
     unittest.main()
