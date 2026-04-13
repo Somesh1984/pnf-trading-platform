@@ -73,9 +73,12 @@ Check QuestDB health:
 python -m trading_app.cli health
 ```
 
-## chart_pnf
+## PnF Usage
 
-`chart_pnf` is the main Point and Figure chart library for this project.
+Use `chart_pnf.PointFigureChart` for chart work in this project.
+
+`chart_pnf` builds the Point and Figure chart. It does not connect to Fyers,
+write to QuestDB, send Telegram messages, or place orders.
 
 Basic close-price example:
 
@@ -83,7 +86,7 @@ Basic close-price example:
 from chart_pnf import PointFigureChart
 
 chart = PointFigureChart(
-    ts={"close": [100, 103, 107.12]},
+    ts={"close": [100, 101, 102, 103, 100, 99, 98]},
     method="cl",
     reversal=3,
     boxsize=1,
@@ -91,6 +94,36 @@ chart = PointFigureChart(
 )
 
 print(chart.matrix)
+print(chart.boxscale)
+print(chart.pnf_timeseries["trend"])
+```
+
+High/low example:
+
+```python
+from chart_pnf import PointFigureChart
+
+chart = PointFigureChart(
+    ts={
+        "high": [100, 102, 104, 103],
+        "low": [100, 101, 99, 98],
+    },
+    method="h/l",
+    reversal=3,
+    boxsize=1,
+    scaling="log",
+)
+
+print(chart.matrix)
+```
+
+Output inspection:
+
+```python
+print(chart.boxscale)       # price levels used by matrix rows
+print(chart.matrix)         # X/O grid: 1 = X, -1 = O, 0 = empty
+print(chart.pnf_timeseries) # per input point chart state
+print(str(chart))           # readable text chart
 ```
 
 ### Methods
@@ -175,12 +208,37 @@ PointFigureChart(ts=data, method="l/h", scaling="log")
 PointFigureChart(ts=data, method="ohlc", scaling="log")
 ```
 
+### Config Values
+
+- `ts`: input data dictionary.
+- `method`: price path to use from each input row.
+- `reversal`: boxes needed to reverse into a new column.
+- `boxsize`: box percentage when `scaling="log"`.
+- `scaling`: use `"log"` for step-frozen percentage boxes.
+
+For `scaling="log"` and `boxsize=1`, each box is 1% of the active reference
+box price for that candle/update.
+
+### Core Boundary
+
+`pnf/` and `chart_pnf/` must stay deterministic.
+
+Do not put these inside PnF code:
+
+- Fyers API calls
+- QuestDB writes
+- Telegram messages
+- paper/live order execution
+- environment variable reads
+
+Those belong in `trading_app/` and later milestones.
+
 ## Tests
 
 Run:
 
 ```powershell
-python -m compileall pnf tests trading_app
+python -m compileall chart_pnf pnf tests trading_app
 python -m pytest -q
 ```
 
