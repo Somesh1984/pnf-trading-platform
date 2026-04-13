@@ -73,6 +73,108 @@ Check QuestDB health:
 python -m trading_app.cli health
 ```
 
+## chart_pnf
+
+`chart_pnf` is the main Point and Figure chart library for this project.
+
+Basic close-price example:
+
+```python
+from chart_pnf import PointFigureChart
+
+chart = PointFigureChart(
+    ts={"close": [100, 103, 107.12]},
+    method="cl",
+    reversal=3,
+    boxsize=1,
+    scaling="log",
+)
+
+print(chart.matrix)
+```
+
+### Methods
+
+`method="cl"` uses close only:
+
+```text
+close
+```
+
+Use this when you want the simplest close-based chart.
+
+`method="h/l"` uses high first, then low:
+
+```text
+high -> low
+```
+
+Use this when the candle high should get priority.
+
+`method="l/h"` uses low first, then high:
+
+```text
+low -> high
+```
+
+Use this when the candle low should get priority.
+
+`method="hlc"` uses close confirmation:
+
+```text
+close confirms
+high/low fills boxes
+```
+
+Use this when you want candle data but do not want high/low touches to change
+the chart unless close confirms the move.
+
+`method="ohlc"` uses candle order:
+
+```text
+bullish candle: open -> low -> high -> close
+bearish candle: open -> high -> low -> close
+```
+
+Use this for OHLC candle-path approximation. OHLC data does not contain the
+real tick order inside the candle, so `cl` or `hlc` is usually clearer for
+trading and replay checks.
+
+### Scaling
+
+`scaling="log"` uses step-frozen percentage boxes:
+
+```text
+box_size = current column last box price * box percentage
+```
+
+The box size is frozen for the full candle/update. This is the recommended
+scaling for project logic.
+
+`scaling="log_compounding"` uses a compatibility logarithmic grid:
+
+```text
+one global compounding price grid
+```
+
+Use this when you need compatibility behavior for comparison.
+
+Other supported scaling modes are:
+
+- `abs`: fixed absolute box size
+- `cla`: classic box size table
+- `atr`: ATR-based box size
+
+Recommended combinations:
+
+```python
+PointFigureChart(ts=data, method="cl", scaling="log")
+PointFigureChart(ts=data, method="hlc", scaling="log")
+PointFigureChart(ts=data, method="h/l", scaling="log")
+PointFigureChart(ts=data, method="l/h", scaling="log")
+PointFigureChart(ts=data, method="ohlc", scaling="log")
+```
+
 ## Tests
 
 Run:
