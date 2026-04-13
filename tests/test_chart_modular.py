@@ -348,6 +348,67 @@ class ChartModularTests(unittest.TestCase):
         np.testing.assert_array_equal(first.matrix, second.matrix)
         np.testing.assert_array_equal(first.pnf_timeseries["trend"], second.pnf_timeseries["trend"])
 
+    def test_log_scaling_small_prices_round_to_cent(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [1.00, 1.03]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        filled_boxes = chart.boxscale[np.where(chart.matrix[:, 0] == 1)]
+
+        np.testing.assert_allclose(filled_boxes, np.array([1.01, 1.02, 1.03]))
+
+    def test_log_scaling_large_prices_create_stable_boxes(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [10000, 10300]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        filled_boxes = chart.boxscale[np.where(chart.matrix[:, 0] == 1)]
+
+        np.testing.assert_allclose(filled_boxes, np.array([10100.0, 10200.0, 10300.0]))
+
+    def test_log_scaling_fractional_percentage_box_steps(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 100.75]},
+            method="cl",
+            reversal=3,
+            boxsize=0.25,
+            scaling="log",
+        )
+
+        filled_boxes = chart.boxscale[np.where(chart.matrix[:, 0] == 1)]
+
+        np.testing.assert_allclose(filled_boxes, np.array([100.25, 100.50, 100.75]))
+
+    def test_log_scaling_multiple_boxes_in_same_update_use_frozen_box_size(self) -> None:
+        chart = PointFigureChart(
+            ts={"close": [100, 105]},
+            method="cl",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        filled_boxes = chart.boxscale[np.where(chart.matrix[:, 0] == 1)]
+
+        np.testing.assert_allclose(filled_boxes, np.array([101.0, 102.0, 103.0, 104.0, 105.0]))
+
+    def test_log_scaling_precision_cases_are_deterministic(self) -> None:
+        ts = {"close": [100, 100.75, 99.99, 101.01, 98.98]}
+        first = PointFigureChart(ts=ts, method="cl", reversal=3, boxsize=0.25, scaling="log")
+        second = PointFigureChart(ts=ts, method="cl", reversal=3, boxsize=0.25, scaling="log")
+
+        np.testing.assert_array_equal(first.matrix, second.matrix)
+        np.testing.assert_array_equal(first.boxscale, second.boxscale)
+        np.testing.assert_array_equal(first.pnf_timeseries["trend"], second.pnf_timeseries["trend"])
+
 
 if __name__ == "__main__":
     unittest.main()
