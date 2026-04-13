@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""ChartSignalMixin helpers for the legacy pyPnF-compatible chart."""
+"""Signal helpers for PointFigureChart.
+
+This module reads completed chart and breakout data to build raw signal arrays.
+These arrays are for inspection and strategy validation; broker execution and
+order approval stay outside chart_pnf.
+"""
 
 from __future__ import annotations
 
@@ -100,9 +105,6 @@ class ChartSignalMixin:
                     idx = x_col_2[-1]
 
                 next_buy = self.boxscale[idx + 1]
-
-        # print('Next Buy: ', next_buy)
-        # print('Next Sell: ', next_sell)
 
         return next_buy, next_sell
 

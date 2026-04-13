@@ -1,4 +1,8 @@
-"""Internal modules for the legacy pyPnF-compatible chart entrypoint."""
+"""Public import surface for the chart_pnf package.
+
+This module exposes PointFigureChart and its mixins for tests, notebooks, and
+inspection tools. It does not build charts or run trading logic by itself.
+"""
 
 from .chart import PointFigureChart
 from .chart_counts import ChartCountMixin

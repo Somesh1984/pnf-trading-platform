@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""ChartSetupMixin helpers for the legacy pyPnF-compatible chart."""
+"""Setup and validation helpers for PointFigureChart.
+
+This module validates chart options, normalizes input time series data, and
+builds box scales for non-step-frozen paths. It does not detect patterns,
+signals, counts, or execute trades.
+"""
 
 from __future__ import annotations
 

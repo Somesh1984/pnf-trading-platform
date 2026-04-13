@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""ChartCountMixin helpers for the legacy pyPnF-compatible chart."""
+"""Count helpers for PointFigureChart.
+
+This module reads completed chart matrix and breakout data to produce count
+inspection dictionaries. It does not create chart columns, generate orders, or
+change trading state.
+"""
 
 from __future__ import annotations
 
@@ -353,7 +358,7 @@ class ChartCountMixin:
             n = n + 1
 
         sort = 'horizontal (signal) R=1'
-        # count row is the base of the column where the signal occors
+        # Count row is the base of the column where the signal occurs.
         # target is count row + width
         # risk1 row under base of signal column
         # risk2 row under lowest low
@@ -370,7 +375,7 @@ class ChartCountMixin:
 
                 perc_filled = self.count_percent_filled(C, width)
                 
-                #find minimum in new boxes
+                # Anchor row is the base row of the breakout column.
                 # count row is the base row of the exit column
                 anc_IDX = np.where (A[:,-1] != 0)[0][0]                  
                 
@@ -386,7 +391,7 @@ class ChartCountMixin:
                 ratio2 = np.round(reward/risk2,2)
 
                 anchor_col = colindex
-                anchor_box = self.boxscale[np.where (A[:,-1] != 0)[0][0]] # base of breakot-column  
+                anchor_box = self.boxscale[np.where (A[:,-1] != 0)[0][0]] # base of breakout column
 
                 box = self.boxscale[boxindex]
                 
@@ -410,7 +415,7 @@ class ChartCountMixin:
 
                 perc_filled = self.count_percent_filled(C, width)
                 
-                #find minimum in new boxes
+                # Anchor row is the base row of the breakdown column.
                 anc_IDX = np.where( A[:,-1] !=0 )[0][-1].astype(int) #+ Extension_Down
                 
                 Target_IDX = anc_IDX - width + Extension_Down
@@ -421,7 +426,7 @@ class ChartCountMixin:
                 target = new_boxscale[Target_IDX]        
                 reward = self.boxscale[boxindex] - target
                 
-                risk1  = self.boxscale[np.where( A[:,-1] != 0)[0][-1]+1] - self.boxscale[boxindex] ##ist das richtig?
+                risk1  = self.boxscale[np.where( A[:,-1] != 0)[0][-1]+1] - self.boxscale[boxindex]
                 ratio1 = np.round(reward/risk1,2)
                 
                 risk2  = self.boxscale[max_IDX+1] - self.boxscale[boxindex]

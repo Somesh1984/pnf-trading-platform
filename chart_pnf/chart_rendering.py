@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""ChartRenderingMixin helpers for the legacy pyPnF-compatible chart."""
+"""Text rendering helpers for PointFigureChart.
+
+This module turns completed chart data into printable tables and summaries for
+inspection. It does not change chart structure, signals, counts, or trading
+state.
+"""
 
 from __future__ import annotations
 

@@ -11,7 +11,12 @@
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
 
-"""Public chart class for the legacy pyPnF-compatible implementation."""
+"""Main PointFigureChart class.
+
+This module combines the setup, engine, pattern, signal, count, rendering, and
+plotting mixins into one chart object. It owns chart initialization only; broker,
+storage, strategy execution, and order logic stay outside chart_pnf.
+"""
 
 from __future__ import annotations
 
@@ -64,7 +69,7 @@ class PointFigureChart(
 
     :method: str
         methods implemented: 'cl', 'h/l', 'l/h', 'hlc', 'ohlc' default('cl')
-    boxscaling: str
+    scaling: str
         scales implemented:
             'abs', 'atr', 'cla', 'log', 'log_compounding' default('log')
         abs:
@@ -74,7 +79,7 @@ class PointFigureChart(
         log:
             step-frozen percentage box sizing.
         log_compounding:
-            legacy logarithmic scaling with a global compounding box grid.
+            compatibility logarithmic scaling with a global compounding box grid.
         cla:
             classic scaling with semi-variable box sizes.
     boxsize: int/float/string
@@ -86,7 +91,7 @@ class PointFigureChart(
     title: str
         user defined label for the chart default(None)
         label will be created inside the class.
-        The label contains contains the chart parameter and the title.
+        The label contains the chart parameters and the title.
 
     Methods:
     ========

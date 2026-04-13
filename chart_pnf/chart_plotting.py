@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""ChartPlottingMixin helpers for the legacy pyPnF-compatible chart."""
+"""Plotting helpers for PointFigureChart.
+
+This module prepares matplotlib views from completed chart, signal, count, and
+indicator data. Plotting is read-only and must not change PnF calculations.
+"""
 
 from __future__ import annotations
 

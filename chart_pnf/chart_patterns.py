@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""ChartPatternMixin helpers for the legacy pyPnF-compatible chart."""
+"""Pattern and trendline helpers for PointFigureChart.
+
+This module reads completed chart matrix data to detect breakouts and
+trendlines. It does not build columns, calculate order targets, or place trades.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Shared constants and lightweight helpers for the legacy chart modules."""
+"""Shared constants and lightweight helpers for chart_pnf.
+
+This module holds common type aliases, bullish/bearish constants, signal labels,
+and the optional tabulate fallback. It must stay free of chart state and trading
+side effects.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
-"""ChartEngineMixin helpers for the legacy pyPnF-compatible chart."""
+"""Chart building engine for PointFigureChart.
+
+This module converts prepared time series data into boxscale, PnF time series,
+and matrix output. It owns step-frozen log chart construction and compatibility
+grid construction; pattern, signal, count, broker, and order logic live
+elsewhere.
+"""
 
 from __future__ import annotations
 

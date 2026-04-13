@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""ChartIndicatorMixin helpers for the legacy pyPnF-compatible chart."""
+"""Indicator helpers for PointFigureChart.
+
+This module builds read-only inspection overlays from completed chart data. It
+does not change chart columns, signals, counts, broker state, or orders.
+"""
 
 from __future__ import annotations
 
