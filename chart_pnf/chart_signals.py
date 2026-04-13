@@ -30,6 +30,14 @@ class ChartSignalMixin:
     if TYPE_CHECKING:
         def get_breakouts(self) -> Any: ...
 
+    @staticmethod
+    def _signal_window_start(column_index: Any, width: Any) -> int:
+        return max(0, int(column_index) - int(width))
+
+    def _signal_ts_index(self, box_index: Any, column_index: Any) -> int:
+        row_index = min(max(int(box_index), 0), np.size(self.action_index_matrix, 0) - 1)
+        return int(self.action_index_matrix[row_index, int(column_index)])
+
     def next_simple_signal(self):
 
         next_buy = np.nan
@@ -100,6 +108,9 @@ class ChartSignalMixin:
 
     def multiple_top_buy(self, label, multiple):
 
+        if not self.breakouts:
+            self.get_breakouts()
+
         max_width = 2 * multiple - 1
 
         array = np.zeros(len(self.pnf_timeseries['box index']))
@@ -119,9 +130,12 @@ class ChartSignalMixin:
             x = ((self.pnf_timeseries['box index'] == ts_idx) & (self.pnf_timeseries['column index'] == c))
             array[x] = self.boxscale[r]
 
-            self.buys[label] = array
+        self.buys[label] = array
 
     def multiple_bottom_sell(self, label, multiple):
+
+        if not self.breakouts:
+            self.get_breakouts()
 
         max_width = 2 * multiple - 1
 
@@ -142,7 +156,7 @@ class ChartSignalMixin:
             x = ((self.pnf_timeseries['box index'] == ts_idx) & (self.pnf_timeseries['column index'] == c))
             array[x] = self.boxscale[r]
 
-            self.sells[label] = array
+        self.sells[label] = array
 
     def double_top_buy(self):
 
@@ -210,7 +224,7 @@ class ChartSignalMixin:
                         self.signals['top box index'][colindex] = highs[n]
                         self.signals['bottom box index'][colindex] = lows[n - 1]
 
-                        ts_index = self.action_index_matrix[boxindex, colindex]
+                        ts_index = self._signal_ts_index(boxindex, colindex)
                         self.signals['ts index'][colindex] = ts_index
                         self.ts_signals_map[ts_index] = colindex
 
@@ -223,7 +237,7 @@ class ChartSignalMixin:
                         self.signals['top box index'][colindex] = highs[n - 1]
                         self.signals['bottom box index'][colindex] = lows[n]
 
-                        ts_index = self.action_index_matrix[boxindex, colindex]
+                        ts_index = self._signal_ts_index(boxindex, colindex)
                         self.signals['ts index'][colindex] = ts_index
                         self.ts_signals_map[ts_index] = colindex
 
@@ -275,7 +289,7 @@ class ChartSignalMixin:
                     self.signals['top box index'][colindex] = np.max(highs[colindex - hits:colindex])
                     self.signals['bottom box index'][colindex] = np.min(lows[colindex - hits:colindex])
 
-                    ts_index = self.action_index_matrix[boxindex, colindex]
+                    ts_index = self._signal_ts_index(boxindex, colindex)
                     self.signals['ts index'][colindex] = ts_index
                     self.ts_signals_map[ts_index] = colindex
 
@@ -300,11 +314,11 @@ class ChartSignalMixin:
                 boxindex = lows[n + 1]
                 self.signals['box index'][colindex] = boxindex
                 self.signals['width'][colindex] = 3
-                self.signals['type'][colindex] = 22
+                self.signals['type'][colindex] = 21
                 self.signals['top box index'][colindex] = highs[n]
                 self.signals['bottom box index'][colindex] = lows[n - 1]
 
-                ts_index = self.action_index_matrix[boxindex, colindex]
+                ts_index = self._signal_ts_index(boxindex, colindex)
                 self.signals['ts index'][colindex] = ts_index
                 self.ts_signals_map[ts_index] = colindex
 
@@ -314,11 +328,11 @@ class ChartSignalMixin:
                 boxindex = highs[n + 1] - 1
                 self.signals['box index'][colindex] = boxindex
                 self.signals['width'][colindex] = 3
-                self.signals['type'][colindex] = 23
+                self.signals['type'][colindex] = 22
                 self.signals['top box index'][colindex] = highs[n - 1]
                 self.signals['bottom box index'][colindex] = lows[n]
 
-                ts_index = self.action_index_matrix[boxindex, colindex]
+                ts_index = self._signal_ts_index(boxindex, colindex)
                 self.signals['ts index'][colindex] = ts_index
                 self.ts_signals_map[ts_index] = colindex
 
@@ -348,6 +362,9 @@ class ChartSignalMixin:
                 prevcol = curcol - 2
                 nextcol = curcol + 1
 
+                if nextcol >= np.size(heights):
+                    continue
+
                 trend = self.breakouts['trend'][n]
 
                 # if the breakout is one box and the next column reverses
@@ -357,10 +374,11 @@ class ChartSignalMixin:
                     self.signals['box index'][colindex] = boxindex
                     self.signals['width'][colindex] = 6
                     self.signals['type'][colindex] = 18
-                    self.signals['top box index'][colindex] = np.max(highs[curcol - 4: nextcol])
-                    self.signals['bottom box index'][colindex] = np.min(lows[curcol - 4: nextcol])
+                    start = self._signal_window_start(nextcol, 5)
+                    self.signals['top box index'][colindex] = np.max(highs[start: nextcol])
+                    self.signals['bottom box index'][colindex] = np.min(lows[start: nextcol])
 
-                    ts_index = self.action_index_matrix[boxindex, colindex]
+                    ts_index = self._signal_ts_index(boxindex, colindex)
                     self.signals['ts index'][colindex] = ts_index
                     self.ts_signals_map[ts_index] = colindex
 
@@ -371,10 +389,11 @@ class ChartSignalMixin:
                     self.signals['box index'][colindex] = boxindex
                     self.signals['width'][colindex] = 6
                     self.signals['type'][colindex] = 19
-                    self.signals['top box index'][colindex] = np.max(highs[curcol - 4: nextcol])
-                    self.signals['bottom box index'][colindex] = np.min(lows[curcol - 4: nextcol])
+                    start = self._signal_window_start(nextcol, 5)
+                    self.signals['top box index'][colindex] = np.max(highs[start: nextcol])
+                    self.signals['bottom box index'][colindex] = np.min(lows[start: nextcol])
 
-                    ts_index = self.action_index_matrix[boxindex, colindex]
+                    ts_index = self._signal_ts_index(boxindex, colindex)
                     self.signals['ts index'][colindex] = ts_index
                     self.ts_signals_map[ts_index] = colindex
                     
@@ -405,10 +424,11 @@ class ChartSignalMixin:
                     self.signals['box index'][colindex] = boxindex
                     self.signals['width'][colindex] = 5
                     self.signals['type'][colindex] = self.breakouts['trend'][n] == 1 and 9 or 10
-                    self.signals['top box index'][colindex] = np.max(highs[colindex - 4: colindex])
-                    self.signals['bottom box index'][colindex] = np.min(lows[colindex - 4: colindex])
+                    start = self._signal_window_start(colindex, 4)
+                    self.signals['top box index'][colindex] = np.max(highs[start: colindex])
+                    self.signals['bottom box index'][colindex] = np.min(lows[start: colindex])
 
-                    ts_index = self.action_index_matrix[boxindex, colindex]
+                    ts_index = self._signal_ts_index(boxindex, colindex)
                     self.signals['ts index'][colindex] = ts_index
                     self.ts_signals_map[ts_index] = colindex
                     
@@ -440,10 +460,11 @@ class ChartSignalMixin:
                     self.signals['box index'][colindex] = boxindex
                     self.signals['width'][colindex] = 7
                     self.signals['type'][colindex] = self.breakouts['trend'][n] == 1 and 11 or 12
-                    self.signals['top box index'][colindex] = np.max(highs[colindex - 6: colindex])
-                    self.signals['bottom box index'][colindex] = np.min(lows[colindex - 6: colindex])
+                    start = self._signal_window_start(colindex, 6)
+                    self.signals['top box index'][colindex] = np.max(highs[start: colindex])
+                    self.signals['bottom box index'][colindex] = np.min(lows[start: colindex])
 
-                    ts_index = self.action_index_matrix[boxindex, colindex]
+                    ts_index = self._signal_ts_index(boxindex, colindex)
                     self.signals['ts index'][colindex] = ts_index
                     self.ts_signals_map[ts_index] = colindex
                     
@@ -477,7 +498,7 @@ class ChartSignalMixin:
                         self.signals['top box index'][colindex] = highs[colindex]
                         self.signals['bottom box index'][colindex] = lows[i - 2]
 
-                        ts_index = self.action_index_matrix[boxindex, colindex]
+                        ts_index = self._signal_ts_index(boxindex, colindex)
                         self.signals['ts index'][colindex] = ts_index
                         self.ts_signals_map[ts_index] = colindex
                         
@@ -497,7 +518,7 @@ class ChartSignalMixin:
                         self.signals['top box index'][colindex] = highs[i - 2]
                         self.signals['bottom box index'][colindex] = lows[colindex]
 
-                        ts_index = self.action_index_matrix[boxindex, colindex]
+                        ts_index = self._signal_ts_index(boxindex, colindex)
                         self.signals['ts index'][colindex] = ts_index
                         self.ts_signals_map[ts_index] = colindex
                     
@@ -526,18 +547,20 @@ class ChartSignalMixin:
                     self.signals['box index'][colindex] = boxindex
                     self.signals['width'][colindex] = self.breakouts['width'][n]
 
-                    ts_index = self.action_index_matrix[boxindex, colindex]
+                    ts_index = self._signal_ts_index(boxindex, colindex)
                     self.signals['ts index'][colindex] = ts_index
                     self.ts_signals_map[ts_index] = colindex
                     
                     if self.breakouts['trend'][n] == 1:
                         self.signals['type'][colindex] = 2
                         self.signals['top box index'][colindex] = highs[colindex]
-                        self.signals['bottom box index'][colindex] = np.min(lows[colindex - self.breakouts['width'][n]: colindex])
+                        start = self._signal_window_start(colindex, self.breakouts['width'][n])
+                        self.signals['bottom box index'][colindex] = np.min(lows[start: colindex])
 
                     if self.breakouts['trend'][n] == -1:
                         self.signals['type'][colindex] = 3
-                        self.signals['top box index'][colindex] = np.max(highs[colindex - self.breakouts['width'][n]: colindex])
+                        start = self._signal_window_start(colindex, self.breakouts['width'][n])
+                        self.signals['top box index'][colindex] = np.max(highs[start: colindex])
                         self.signals['bottom box index'][colindex] = lows[colindex]
 
         return self.signals
@@ -563,18 +586,20 @@ class ChartSignalMixin:
                 self.signals['box index'][colindex] = boxindex
                 self.signals['width'][colindex] = self.breakouts['width'][n]
 
-                ts_index = self.action_index_matrix[boxindex, colindex]
+                ts_index = self._signal_ts_index(boxindex, colindex)
                 self.signals['ts index'][colindex] = ts_index
                 self.ts_signals_map[ts_index] = colindex
                 
                 if self.breakouts['trend'][n] == 1:
                     self.signals['type'][colindex] = 4
                     self.signals['top box index'][colindex] = highs[colindex]
-                    self.signals['bottom box index'][colindex] = np.min(lows[colindex - self.breakouts['width'][n]: colindex])
+                    start = self._signal_window_start(colindex, self.breakouts['width'][n])
+                    self.signals['bottom box index'][colindex] = np.min(lows[start: colindex])
 
                 if self.breakouts['trend'][n] == -1:
                     self.signals['type'][colindex] = 5
-                    self.signals['top box index'][colindex] = np.max(highs[colindex - self.breakouts['width'][n]: colindex])
+                    start = self._signal_window_start(colindex, self.breakouts['width'][n])
+                    self.signals['top box index'][colindex] = np.max(highs[start: colindex])
                     self.signals['bottom box index'][colindex] = lows[colindex]
 
         return self.signals
@@ -600,18 +625,20 @@ class ChartSignalMixin:
                 self.signals['box index'][colindex] = boxindex
                 self.signals['width'][colindex] = self.breakouts['width'][n]
 
-                ts_index = self.action_index_matrix[boxindex, colindex]
+                ts_index = self._signal_ts_index(boxindex, colindex)
                 self.signals['ts index'][colindex] = ts_index
                 self.ts_signals_map[ts_index] = colindex
                 
                 if self.breakouts['trend'][n] == 1:
                     self.signals['type'][colindex] = 19
                     self.signals['top box index'][colindex] = highs[colindex]
-                    self.signals['bottom box index'][colindex] = np.min(lows[colindex - self.breakouts['width'][n]+1: colindex])
+                    start = self._signal_window_start(colindex, self.breakouts['width'][n] - 1)
+                    self.signals['bottom box index'][colindex] = np.min(lows[start: colindex])
 
                 if self.breakouts['trend'][n] == -1:
                     self.signals['type'][colindex] = 20
-                    self.signals['top box index'][colindex] = np.max(highs[colindex - self.breakouts['width'][n]+1: colindex])
+                    start = self._signal_window_start(colindex, self.breakouts['width'][n] - 1)
+                    self.signals['top box index'][colindex] = np.max(highs[start: colindex])
                     self.signals['bottom box index'][colindex] = lows[colindex]
 
         return self.signals
@@ -637,18 +664,20 @@ class ChartSignalMixin:
                 self.signals['box index'][colindex] = boxindex
                 self.signals['width'][colindex] = self.breakouts['width'][n]
 
-                ts_index = self.action_index_matrix[boxindex, colindex]
+                ts_index = self._signal_ts_index(boxindex, colindex)
                 self.signals['ts index'][colindex] = ts_index
                 self.ts_signals_map[ts_index] = colindex
                 
                 if self.breakouts['trend'][n] == 1:
                     self.signals['type'][colindex] = 6
                     self.signals['top box index'][colindex] = highs[colindex]
-                    self.signals['bottom box index'][colindex] = np.min(lows[colindex - self.breakouts['width'][n]: colindex])
+                    start = self._signal_window_start(colindex, self.breakouts['width'][n])
+                    self.signals['bottom box index'][colindex] = np.min(lows[start: colindex])
 
                 if self.breakouts['trend'][n] == -1:
                     self.signals['type'][colindex] = 7
-                    self.signals['top box index'][colindex] = np.max(highs[colindex - self.breakouts['width'][n]: colindex])
+                    start = self._signal_window_start(colindex, self.breakouts['width'][n])
+                    self.signals['top box index'][colindex] = np.max(highs[start: colindex])
                     self.signals['bottom box index'][colindex] = lows[colindex]
 
         return self.signals
