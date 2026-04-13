@@ -244,6 +244,9 @@ def _process_step_update(
     reference = active.last_box
     box_size = _step_box_size(reference, config)
 
+    if config.method == 'hlc':
+        return _process_step_hlc_update(active, update, reference, box_size, config)
+
     for price_name in _step_update_order(active, config):
         price = getattr(update, price_name)
         if price is None:
@@ -255,6 +258,36 @@ def _process_step_update(
     return active
 
 
+def _process_step_hlc_update(
+    active: _StepFrozenColumn,
+    update: _StepFrozenUpdate,
+    reference: Decimal,
+    box_size: Decimal,
+    config: _StepFrozenConfig,
+) -> _StepFrozenColumn:
+    if update.close is None:
+        return active
+
+    if active.type == 'X':
+        boxes = _step_boxes_above(update.close, reference, box_size)
+        if boxes >= 1 and update.high is not None:
+            return _process_step_price(active, update.high, update.index, reference, box_size, config)
+
+        boxes = _step_boxes_below(update.close, reference, box_size)
+        if boxes >= config.reversal and update.low is not None:
+            return _process_step_price(active, update.low, update.index, reference, box_size, config)
+        return active
+
+    boxes = _step_boxes_below(update.close, reference, box_size)
+    if boxes >= 1 and update.low is not None:
+        return _process_step_price(active, update.low, update.index, reference, box_size, config)
+
+    boxes = _step_boxes_above(update.close, reference, box_size)
+    if boxes >= config.reversal and update.high is not None:
+        return _process_step_price(active, update.high, update.index, reference, box_size, config)
+    return active
+
+
 def _step_update_order(active: _StepFrozenColumn, config: _StepFrozenConfig) -> tuple[str, ...]:
     if config.method == 'cl':
         return ('close',)
@@ -262,9 +295,7 @@ def _step_update_order(active: _StepFrozenColumn, config: _StepFrozenConfig) -> 
         return ('high', 'low')
     if config.method == 'l/h':
         return ('low', 'high')
-    if active.type == 'X':
-        return ('high', 'low', 'close')
-    return ('low', 'high', 'close')
+    raise ValueError(f"Unsupported step-frozen method: {config.method}")
 
 
 def _process_step_price(

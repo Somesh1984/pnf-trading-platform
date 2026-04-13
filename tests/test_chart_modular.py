@@ -148,6 +148,71 @@ class ChartModularTests(unittest.TestCase):
         self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
         self.assertEqual(chart.pnf_timeseries["filled boxes"][2], 3)
 
+    def test_log_scaling_hlc_requires_close_to_confirm_extension(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "high": [100, 103, 104.03],
+                "low": [100, 103, 100],
+                "close": [100, 103, 103.50],
+            },
+            method="hlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 0]), 3)
+
+    def test_log_scaling_hlc_uses_high_after_close_confirms_extension(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "high": [100, 103, 105.06],
+                "low": [100, 103, 100],
+                "close": [100, 103, 104.03],
+            },
+            method="hlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 0]), 5)
+
+    def test_log_scaling_hlc_requires_close_to_confirm_reversal(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "high": [100, 103, 103],
+                "low": [100, 103, 99.91],
+                "close": [100, 103, 101],
+            },
+            method="hlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 0]), 3)
+
+    def test_log_scaling_hlc_uses_low_after_close_confirms_reversal(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "high": [100, 103, 103],
+                "low": [100, 103, 98.88],
+                "close": [100, 103, 99.91],
+            },
+            method="hlc",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 2)
+        self.assertEqual(np.count_nonzero(chart.matrix[:, 1]), 4)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
+
 
 if __name__ == "__main__":
     unittest.main()
