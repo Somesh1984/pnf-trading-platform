@@ -1,6 +1,8 @@
+import inspect
 import unittest
 
 import numpy as np
+import chart_pnf.chart_engine as chart_engine_module
 
 from chart_pnf import (
     ChartCountMixin,
@@ -48,6 +50,9 @@ class ChartModularTests(unittest.TestCase):
 
         for mixin in expected_mixins:
             self.assertTrue(issubclass(PointFigureChart, mixin))
+
+    def test_chart_engine_does_not_depend_on_pnf_core(self) -> None:
+        self.assertNotIn("pnf.core", inspect.getsource(chart_engine_module))
 
     def test_log_scaling_uses_step_frozen_percentage_boxes_for_close_method(self) -> None:
         chart = PointFigureChart(
@@ -110,6 +115,38 @@ class ChartModularTests(unittest.TestCase):
         self.assertEqual(chart.matrix.shape[1], 2)
         self.assertEqual(chart.pnf_timeseries["trend"][1], 1)
         self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
+
+    def test_log_scaling_high_low_method_uses_high_before_low(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "high": [100, 103, 104.03],
+                "low": [100, 103, 99.91],
+            },
+            method="h/l",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 1)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], 1)
+        self.assertEqual(chart.pnf_timeseries["filled boxes"][2], 4)
+
+    def test_log_scaling_low_high_method_uses_low_before_high(self) -> None:
+        chart = PointFigureChart(
+            ts={
+                "high": [100, 103, 104.03],
+                "low": [100, 103, 99.91],
+            },
+            method="l/h",
+            reversal=3,
+            boxsize=1,
+            scaling="log",
+        )
+
+        self.assertEqual(chart.matrix.shape[1], 2)
+        self.assertEqual(chart.pnf_timeseries["trend"][2], -1)
+        self.assertEqual(chart.pnf_timeseries["filled boxes"][2], 3)
 
 
 if __name__ == "__main__":

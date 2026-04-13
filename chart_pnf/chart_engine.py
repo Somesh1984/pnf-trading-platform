@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from dataclasses import dataclass
+from decimal import Context, Decimal, InvalidOperation, ROUND_FLOOR, ROUND_HALF_UP
+from math import isfinite
+from typing import Any, Iterable, Iterator, TYPE_CHECKING
 from warnings import warn
 
 import numpy as np
@@ -11,9 +14,308 @@ from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Circle
 
-from pnf.core import PnFConfig, build_columns
-
 from .chart_shared import BEARISH, BULLISH, BoxSize, DateTimeUnit, SIGNAL_TYPES, tabulate
+
+
+_STEP_CONTEXT = Context(prec=34)
+_STEP_TICK_SIZE = Decimal("0.01")
+
+
+@dataclass(frozen=True)
+class _StepFrozenConfig:
+    box_pct: Decimal
+    reversal: int
+    method: str
+    tick_size: Decimal = _STEP_TICK_SIZE
+
+
+@dataclass(frozen=True)
+class _StepFrozenColumn:
+    type: str
+    start_index: int
+    end_index: int
+    boxes: tuple[Decimal, ...]
+
+    @property
+    def high(self) -> Decimal:
+        return max(self.boxes)
+
+    @property
+    def low(self) -> Decimal:
+        return min(self.boxes)
+
+    @property
+    def last_box(self) -> Decimal:
+        return self.high if self.type == 'X' else self.low
+
+    @property
+    def box_count(self) -> int:
+        return len(self.boxes)
+
+
+@dataclass(frozen=True)
+class _StepFrozenUpdate:
+    index: int
+    close: Decimal | None = None
+    high: Decimal | None = None
+    low: Decimal | None = None
+
+
+def _to_step_decimal(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        result = value
+    elif isinstance(value, float):
+        if not isfinite(value):
+            return None
+        result = Decimal(str(value))
+    else:
+        try:
+            result = Decimal(str(value))
+        except (InvalidOperation, ValueError):
+            return None
+    if not result.is_finite():
+        return None
+    return result
+
+
+def _require_step_price(value: Any) -> Decimal | None:
+    result = _to_step_decimal(value)
+    if result is None:
+        return None
+    if result <= 0:
+        raise ValueError("prices must be positive")
+    return result
+
+
+def _round_step_price(price: Decimal, config: _StepFrozenConfig) -> Decimal:
+    units = _STEP_CONTEXT.divide(price, config.tick_size)
+    rounded_units = units.to_integral_value(rounding=ROUND_HALF_UP)
+    rounded = _STEP_CONTEXT.multiply(rounded_units, config.tick_size)
+    return rounded.quantize(config.tick_size, rounding=ROUND_HALF_UP)
+
+
+def _step_box_size(reference: Decimal, config: _StepFrozenConfig) -> Decimal:
+    box_size = _STEP_CONTEXT.multiply(reference, config.box_pct)
+    if box_size <= 0:
+        raise ValueError("box size must be positive")
+    return box_size
+
+
+def _step_boxes_above(price: Decimal, reference: Decimal, box_size: Decimal) -> int:
+    if price <= reference:
+        return 0
+    distance = _STEP_CONTEXT.subtract(price, reference)
+    return int(_STEP_CONTEXT.divide(distance, box_size).to_integral_value(rounding=ROUND_FLOOR))
+
+
+def _step_boxes_below(price: Decimal, reference: Decimal, box_size: Decimal) -> int:
+    if price >= reference:
+        return 0
+    distance = _STEP_CONTEXT.subtract(reference, price)
+    return int(_STEP_CONTEXT.divide(distance, box_size).to_integral_value(rounding=ROUND_FLOOR))
+
+
+def _step_box_values(
+    reference: Decimal,
+    count: int,
+    direction: str,
+    box_size: Decimal,
+    config: _StepFrozenConfig,
+) -> tuple[Decimal, ...]:
+    if direction == 'up':
+        return tuple(
+            _round_step_price(_STEP_CONTEXT.add(reference, _STEP_CONTEXT.multiply(box_size, Decimal(step))), config)
+            for step in range(1, count + 1)
+        )
+    return tuple(
+        _round_step_price(_STEP_CONTEXT.subtract(reference, _STEP_CONTEXT.multiply(box_size, Decimal(step))), config)
+        for step in range(1, count + 1)
+    )
+
+
+def _build_step_frozen_columns(
+    data: Iterable[dict[str, Any]],
+    config: _StepFrozenConfig,
+) -> list[_StepFrozenColumn]:
+    columns: list[_StepFrozenColumn] = []
+    initial_reference: Decimal | None = None
+    initial_index: int | None = None
+    initial_box_size: Decimal | None = None
+
+    for update in _iter_step_frozen_updates(data, config):
+        if not columns:
+            for price in _initial_step_prices(update, config):
+                if initial_reference is None:
+                    initial_reference = price
+                    initial_index = update.index
+                    initial_box_size = _step_box_size(initial_reference, config)
+                    continue
+                assert initial_index is not None
+                assert initial_box_size is not None
+                column = _try_initial_step_column(
+                    price=price,
+                    index=update.index,
+                    initial_index=initial_index,
+                    reference=initial_reference,
+                    box_size=initial_box_size,
+                    config=config,
+                )
+                if column is not None:
+                    columns.append(column)
+                    break
+            continue
+
+        active = columns[-1]
+        updated = _process_step_update(active, update, config)
+        if updated is active:
+            continue
+        if updated.type == active.type:
+            columns[-1] = updated
+        else:
+            columns.append(updated)
+
+    return columns
+
+
+def _iter_step_frozen_updates(
+    data: Iterable[dict[str, Any]],
+    config: _StepFrozenConfig,
+) -> Iterator[_StepFrozenUpdate]:
+    for index, item in enumerate(data):
+        close = _require_step_price(item.get('close'))
+        high = _require_step_price(item.get('high'))
+        low = _require_step_price(item.get('low'))
+
+        close = _round_step_price(close, config) if close is not None else None
+        high = _round_step_price(high, config) if high is not None else None
+        low = _round_step_price(low, config) if low is not None else None
+
+        if high is not None and low is not None and high < low:
+            raise ValueError("high must be greater than or equal to low")
+        if config.method == 'hlc' and close is not None and high is not None and close > high:
+            raise ValueError("close must be less than or equal to high")
+        if config.method == 'hlc' and close is not None and low is not None and close < low:
+            raise ValueError("close must be greater than or equal to low")
+
+        if close is None and high is None and low is None:
+            continue
+        yield _StepFrozenUpdate(index=index, close=close, high=high, low=low)
+
+
+def _initial_step_prices(update: _StepFrozenUpdate, config: _StepFrozenConfig) -> tuple[Decimal, ...]:
+    if config.method == 'cl':
+        return () if update.close is None else (update.close,)
+    if config.method == 'l/h':
+        return tuple(price for price in (update.low, update.high) if price is not None)
+    values = [update.high, update.low]
+    if config.method == 'hlc':
+        values.append(update.close)
+    return tuple(price for price in values if price is not None)
+
+
+def _try_initial_step_column(
+    price: Decimal,
+    index: int,
+    initial_index: int,
+    reference: Decimal,
+    box_size: Decimal,
+    config: _StepFrozenConfig,
+) -> _StepFrozenColumn | None:
+    up_boxes = _step_boxes_above(price, reference, box_size)
+    if up_boxes >= config.reversal:
+        boxes = _step_box_values(reference, up_boxes, 'up', box_size, config)
+        return _StepFrozenColumn('X', initial_index, index, boxes)
+
+    down_boxes = _step_boxes_below(price, reference, box_size)
+    if down_boxes >= config.reversal:
+        boxes = _step_box_values(reference, down_boxes, 'down', box_size, config)
+        return _StepFrozenColumn('O', initial_index, index, boxes)
+
+    return None
+
+
+def _process_step_update(
+    active: _StepFrozenColumn,
+    update: _StepFrozenUpdate,
+    config: _StepFrozenConfig,
+) -> _StepFrozenColumn:
+    reference = active.last_box
+    box_size = _step_box_size(reference, config)
+
+    for price_name in _step_update_order(active, config):
+        price = getattr(update, price_name)
+        if price is None:
+            continue
+        updated = _process_step_price(active, price, update.index, reference, box_size, config)
+        if updated is not active:
+            return updated
+
+    return active
+
+
+def _step_update_order(active: _StepFrozenColumn, config: _StepFrozenConfig) -> tuple[str, ...]:
+    if config.method == 'cl':
+        return ('close',)
+    if config.method == 'h/l':
+        return ('high', 'low')
+    if config.method == 'l/h':
+        return ('low', 'high')
+    if active.type == 'X':
+        return ('high', 'low', 'close')
+    return ('low', 'high', 'close')
+
+
+def _process_step_price(
+    active: _StepFrozenColumn,
+    price: Decimal,
+    index: int,
+    reference: Decimal,
+    box_size: Decimal,
+    config: _StepFrozenConfig,
+) -> _StepFrozenColumn:
+    if active.type == 'X':
+        boxes = _step_boxes_above(price, reference, box_size)
+        if boxes >= 1:
+            return _extend_step_column(active, boxes, 'up', box_size, index, config)
+        boxes = _step_boxes_below(price, reference, box_size)
+        if boxes >= config.reversal:
+            return _new_step_column('O', reference, boxes, 'down', box_size, index, config)
+        return active
+
+    boxes = _step_boxes_below(price, reference, box_size)
+    if boxes >= 1:
+        return _extend_step_column(active, boxes, 'down', box_size, index, config)
+    boxes = _step_boxes_above(price, reference, box_size)
+    if boxes >= config.reversal:
+        return _new_step_column('X', reference, boxes, 'up', box_size, index, config)
+    return active
+
+
+def _extend_step_column(
+    active: _StepFrozenColumn,
+    count: int,
+    direction: str,
+    box_size: Decimal,
+    index: int,
+    config: _StepFrozenConfig,
+) -> _StepFrozenColumn:
+    boxes = active.boxes + _step_box_values(active.last_box, count, direction, box_size, config)
+    return _StepFrozenColumn(active.type, active.start_index, index, boxes)
+
+
+def _new_step_column(
+    kind: str,
+    reference: Decimal,
+    count: int,
+    direction: str,
+    box_size: Decimal,
+    index: int,
+    config: _StepFrozenConfig,
+) -> _StepFrozenColumn:
+    boxes = _step_box_values(reference, count, direction, box_size, config)
+    return _StepFrozenColumn(kind, index, index, boxes)
 
 
 class ChartEngineMixin:
@@ -33,23 +335,16 @@ class ChartEngineMixin:
         return self.scaling == 'log'
 
     def _get_step_frozen_log_chart(self):
-        method_map = {
-            'cl': 'close',
-            'h/l': 'high_low',
-            'l/h': 'high_low',
-            'hlc': 'high_low_close',
-        }
-        if self.method not in method_map:
+        if self.method == 'ohlc':
             raise ValueError('Step-frozen log scaling is not implemented for ohlc method')
 
         data = self._iter_step_frozen_log_input()
-        config = PnFConfig(
-            box_pct=float(self.boxsize) / 100.0,
+        config = _StepFrozenConfig(
+            box_pct=Decimal(str(float(self.boxsize) / 100.0)),
             reversal=self.reversal,
-            method=method_map[self.method],
-            scaling='step_box',
+            method=self.method,
         )
-        columns = build_columns(data, config)
+        columns = _build_step_frozen_columns(data, config)
         if not columns:
             raise ValueError('Choose a smaller box size. There is no trend using the current parameter.')
 
