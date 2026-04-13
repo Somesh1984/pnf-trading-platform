@@ -502,10 +502,9 @@ class ChartCountMixin:
         new_boxscale = self._get_boxscale([Extension_Up, Extension_Down])
 
 
-        if self.scaling == 'abs' and new_boxscale[0] == 0:
-            Extension_Down = np.where(new_boxscale == self.boxscale[0])[0][0]
-        elif self.scaling == 'log' and new_boxscale[0] == 0.0001:
-            Extension_Down = np.where(new_boxscale == self.boxscale[0])[0][0]
+        original_scale_start = np.where(new_boxscale == self.boxscale[0])[0]
+        if np.size(original_scale_start) > 0:
+            Extension_Down = int(original_scale_start[0])
         
         # call functions to find counts
         if self.reversal > 1:
