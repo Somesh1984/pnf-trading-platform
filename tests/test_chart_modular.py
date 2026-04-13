@@ -1,5 +1,6 @@
 import inspect
 import unittest
+from typing import Any
 
 import numpy as np
 import chart_pnf.chart_engine as chart_engine_module
@@ -67,8 +68,16 @@ class ChartModularTests(unittest.TestCase):
             PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3, boxsize=1, scaling="linear")
 
     def test_chart_rejects_invalid_reversal_type(self) -> None:
+        invalid_reversal: Any = 3.0
+
         with self.assertRaises(ValueError):
-            PointFigureChart(ts={"close": [100, 103]}, method="cl", reversal=3.0, boxsize=1, scaling="log")
+            PointFigureChart(
+                ts={"close": [100, 103]},
+                method="cl",
+                reversal=invalid_reversal,
+                boxsize=1,
+                scaling="log",
+            )
 
     def test_chart_rejects_reversal_less_than_one(self) -> None:
         with self.assertRaises(ValueError):

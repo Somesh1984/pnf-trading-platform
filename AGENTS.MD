@@ -737,3 +737,16 @@ A task is done only when:
 * no secrets are committed
 * deterministic behavior is preserved
 * final response explains what changed and what was verified
+
+---
+
+## 35. Commit Permission Rule
+
+Codex must ask for explicit user permission before every `git commit`.
+
+Rules:
+
+* code, test, and documentation changes may be prepared normally
+* tests/checks may be run before asking for commit permission
+* do not create a commit until the user clearly says to commit
+* after commit, summarize commit hash and included files
