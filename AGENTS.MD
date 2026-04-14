@@ -123,13 +123,15 @@ logic. The current issue decides the task scope.
 
 ## 8. Testing And Review Workflow
 
+
+
 For each task:
 
 1. run relevant tests/checks
 2. report what passed and what failed
 3. summarize changed files
 4. let the user review the work
-5. only then prepare for commit/close
+5. only then prepare for commit/close with meaning full message 
 
 A task is not done until:
 
@@ -137,7 +139,7 @@ A task is not done until:
 * relevant tests/checks pass or failures are clearly reported
 * no unrelated files are changed
 * no secrets are committed
-* final response explains what changed and what was verified
+* if user asked  final response explains what changed and what was verified 
 
 ---
 
@@ -152,9 +154,22 @@ Rules:
 * user review happens before issue is treated as done
 * issue should be marked `Done` only after review/commit/close flow is complete
 
+Project status order:
+
+`Backlog -> Ready -> In Progress -> Review -> Blocked or Done`
+
+Status usage:
+
+* `Backlog` = issue created but not started
+* `Ready` = issue is clear and ready to pick next
+* `In Progress` = active implementation is happening
+* `Review` = implementation and checks are done, waiting for user review
+* `Blocked` = work cannot continue until a blocker is resolved
+* `Done` = review/commit/push-close flow is complete
+
 Preferred task flow:
 
-`PLAN.MD -> Milestone -> GitHub Issue -> In Progress -> Implement -> Test -> User Review -> Commit -> Push/Close -> Done`
+`PLAN.MD -> Milestone -> GitHub Issue -> Backlog -> Ready -> In Progress -> Implement -> Test -> Review -> Commit -> Push/Close -> Done`
 
 ---
 
@@ -184,7 +199,7 @@ Communication must stay simple and practical.
 
 Rules:
 
-* explain before editing
+* explain before editing if user asks or any conflict in issue description
 * keep updates short and clear
 * use simple language
 * do not overwhelm the user
