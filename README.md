@@ -40,6 +40,7 @@ Copy-Item .env.example .env
 ```
 
 Do not commit `.env`.
+The app reads `.env` automatically; shell environment variables override file values.
 
 ## QuestDB
 

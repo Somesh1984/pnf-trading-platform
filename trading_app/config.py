@@ -1,17 +1,31 @@
 from __future__ import annotations
 
+"""Runtime config loading for the local trading app.
+
+Read order:
+1. explicit `load_config(env=...)` input
+2. local `.env` file
+3. current shell environment, which overrides `.env`
+"""
+
 from dataclasses import asdict, dataclass
 from os import environ
+from pathlib import Path
 from typing import Mapping
 
 
-SECRET_FIELDS = {
-    "fyers_secret_key",
-    "fyers_access_token",
-    "telegram_bot_token",
-}
+# Paths and secret field names used by config output.
+DEFAULT_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+SECRET_FIELDS = frozenset(
+    {
+        "fyers_secret_key",
+        "fyers_access_token",
+        "telegram_bot_token",
+    }
+)
 
 
+# Small parsing helpers used by `load_config()`.
 def _get_bool(env: Mapping[str, str], key: str, default: bool) -> bool:
     value = env.get(key)
     if value is None or value == "":
@@ -41,8 +55,50 @@ def _get_str(env: Mapping[str, str], key: str, default: str = "") -> str:
     return env.get(key, default).strip()
 
 
+def _strip_optional_quotes(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _load_dotenv_file(path: Path) -> dict[str, str]:
+    """Read a simple KEY=VALUE .env file without external dependencies."""
+    if not path.is_file():
+        return {}
+
+    values: dict[str, str] = {}
+    for lineno, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if "=" not in line:
+            raise ValueError(f"Invalid .env line {lineno}: expected KEY=VALUE")
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"Invalid .env line {lineno}: missing key")
+
+        values[key] = _strip_optional_quotes(value.strip())
+
+    return values
+
+
+def _build_env_source(env: Mapping[str, str] | None) -> Mapping[str, str]:
+    """Build the final config source with clear override order."""
+    if env is not None:
+        return env
+
+    source = _load_dotenv_file(DEFAULT_ENV_PATH)
+    source.update(environ)
+    return source
+
+
 @dataclass(frozen=True)
 class AppConfig:
+    """Strongly-typed runtime config used by CLI and app services."""
+
     app_env: str = "development"
     log_level: str = "INFO"
     trading_mode: str = "paper"
@@ -59,6 +115,20 @@ class AppConfig:
     telegram_chat_id: str = ""
 
     @property
+    def fyers_auth_configured(self) -> bool:
+        return all(
+            (
+                self.fyers_client_id,
+                self.fyers_secret_key,
+                self.fyers_redirect_uri,
+            )
+        )
+
+    @property
+    def fyers_access_token_configured(self) -> bool:
+        return bool(self.fyers_access_token)
+
+    @property
     def questdb_http_url(self) -> str:
         return f"http://{self.questdb_host}:{self.questdb_http_port}"
 
@@ -72,8 +142,8 @@ class AppConfig:
 
 
 def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
-    source = environ if env is None else env
-
+    """Load config from explicit env, `.env`, and shell environment."""
+    source = _build_env_source(env)
     config = AppConfig(
         app_env=_get_str(source, "APP_ENV", "development"),
         log_level=_get_str(source, "LOG_LEVEL", "INFO").upper(),
@@ -95,6 +165,7 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
 
 
 def validate_config(config: AppConfig) -> None:
+    """Keep basic runtime settings valid before the app starts."""
     if config.trading_mode not in {"paper", "live"}:
         raise ValueError("TRADING_MODE must be 'paper' or 'live'")
 
@@ -110,6 +181,7 @@ def validate_config(config: AppConfig) -> None:
 
 
 def redacted_config(config: AppConfig) -> dict[str, object]:
+    """Return config data safe for CLI/debug output."""
     data = asdict(config)
     for field in SECRET_FIELDS:
         if data.get(field):
