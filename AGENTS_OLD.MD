@@ -27,22 +27,7 @@ that belongs in issues, docs, or tests.
 
 ---
 
-## 3. Repo Context
-
-Primary working context for this repo:
-
-* Python is the main implementation language
-* `pytest` is the main test runner
-* Docker Compose is used for local services
-* QuestDB is the current time-series storage choice in the roadmap
-* GitHub issues are the execution spec for active tasks
-
-Use existing repo patterns unless the current issue or user instruction says
-otherwise.
-
----
-
-## 4. Sources Of Truth
+## 3. Sources Of Truth
 
 Use this order of truth:
 
@@ -56,7 +41,7 @@ If any of these conflict, pause and ask the user before implementing.
 
 ---
 
-## 5. Milestone -> Issue Workflow
+## 4. Milestone -> Issue Workflow
 
 For project work, always follow this order:
 
@@ -75,7 +60,7 @@ Do not work on multiple unrelated issues in one change.
 
 ---
 
-## 6. Issue Execution Rules
+## 5. Issue Execution Rules
 
 The GitHub issue description is the execution spec for the task.
 
@@ -99,18 +84,15 @@ Then implement if the user has asked for execution.
 
 ---
 
-## 7. Implementation Rules
+## 6. Implementation Rules
 
 When implementing:
 
 * read existing code first
 * follow existing local patterns
 * keep changes focused
-* keep the project structured, modular, and maintainable
 * keep code modular and testable
 * avoid unrelated refactors
-* prefer production-grade implementations over quick hacks
-* consider performance when changes affect shared or large-data paths
 * preserve deterministic behavior where market/chart/data logic is involved
 * update docs when behavior or usage changes
 
@@ -121,7 +103,7 @@ logic. The current issue decides the task scope.
 
 ---
 
-## 8. Testing And Review Workflow
+## 7. Testing And Review Workflow
 
 For each task:
 
@@ -141,7 +123,7 @@ A task is not done until:
 
 ---
 
-## 9. Git And GitHub Rules
+## 8. Git And GitHub Rules
 
 Rules:
 
@@ -158,7 +140,7 @@ Preferred task flow:
 
 ---
 
-## 10. Safety Rules
+## 9. Safety Rules
 
 Always pause and ask before:
 
@@ -178,7 +160,7 @@ Never suggest shortcuts that bypass:
 
 ---
 
-## 11. Communication Rules
+## 10. Communication Rules
 
 Communication must stay simple and practical.
 
@@ -193,7 +175,7 @@ Rules:
 
 ---
 
-## 12. Conflict Handling
+## 11. Conflict Handling
 
 If there is any conflict between:
 
