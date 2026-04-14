@@ -5,10 +5,11 @@ Production-oriented trading platform around a deterministic Point and Figure
 
 ## Current Milestone
 
-`M1 Foundation` from `PLAN.MD`.
+`M2 PnF Core Stable` from `PLAN.MD`.
 
-The foundation milestone creates the project base, local QuestDB service,
-runtime configuration, logging, a health-check CLI, and starter documentation.
+This milestone focuses on deterministic Point and Figure behavior: chart
+building, step-frozen log scaling, methods, patterns, signals, trendlines,
+levels, counts, rendering, docs, and comparison checks.
 
 ## Safety
 
